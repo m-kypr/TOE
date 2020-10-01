@@ -4,13 +4,13 @@ app = Flask(__name__)
 
 colors = [(255, 0, 0), (0, 255, 0),
           (0, 0, 0), (0, 0, 255)]
-
+colors = ['red', 'blue', 'white', 'green', 'yellow']
 
 @app.route('/')
 def hello_world():
     color = random.choice(colors)
     html = []
-    size = 200
+    size = 150
     border = size//100
     for i in range(3):
         for j in range(3):
@@ -21,6 +21,7 @@ def hello_world():
         text-align: center;
         display: flex;
         flex-direction: column;
+        # background-color: {color};
         justify-content: center;}}</style>""")
 
 
