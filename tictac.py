@@ -18,6 +18,15 @@ PACKET_BUFFER = {}
 app = Flask(__name__)
 
 
+@app.route('/emote')
+def emote():
+  id = request.args.get("id")
+  import requests
+  buf = requests.get(f"https://cdn.betterttv.net/emote/{id}/4x").content
+  a = open("static/emote.png", 'wb').write(buf)
+  return buf
+
+
 @app.route('/gid')
 def gid():
   import shortuuid
@@ -105,5 +114,5 @@ if __name__ == "__main__":
   from threading import Thread
   t = Thread(target=house_keeper)
   t.start()
-  app.run(host='0.0.0.0', port=80, debug=DEBUG)
+  app.run(host='0.0.0.0', port=80, debug=True)
   t.join()

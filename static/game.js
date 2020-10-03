@@ -6,6 +6,7 @@ var turn = "X";
 var lastMove;
 var gameOver;
 var scores = [0, 0]
+var emotes = []
 const updateRate = 500
 const gridSize = 3
 const gridElementSize = 100
@@ -36,9 +37,57 @@ const resize = () => {
     }
   }
 }
+function _arrayBufferToBase64(buffer) {
+  var binary = '';
+  var bytes = new Uint8Array(buffer);
+  var len = bytes.byteLength;
+  for (var i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+}
 
-function addChatMessage(sender, message) {
-  messages.innerText += ["[", sender, "]: ", message, "\n"].join("")
+function emotify(text) {
+  // 56e9f494fff3cc5c35e5287e
+  // https://api.betterttv.net/3/cached/emote
+  if (emotes.length == 0) {
+    request("GET", "https://api.betterttv.net/3/cached/emotes/global", function (xhr) {
+      emotes = JSON.parse(xhr.responseText)
+    })
+  }
+  for (let i = 0; i < emotes.length; i++) {
+    let emote = emotes[i]
+    if (emote['data'] == undefined) {
+      request("GET", "/emote", function (xhr) {
+        emote['data'] = _arrayBufferToBase64(xhr.response)
+      }, [], "", ["id=" + emote['id']], "arraybuffer")
+      if (emote['code'] === text) {
+        return emote['data']
+      }
+    }
+  }
+  return 0;
+}
+
+
+function addChatMessage(sender = "", message) {
+  var msgBuf = []
+  message.split(" ").forEach(function (w) {
+    let data = emotify(w)
+    console.log(data)
+    if (data == 0) {
+      msgBuf.push(w)
+      return
+    }
+    let tmpImg = document.createElement("img")
+    tmpImg.src = "data:image/png;base64," + _arrayBufferToBase64(xhr.response)
+    document.getElementById("messages").appendChild(tmpImg)
+  })
+  if (sender.length == 0) {
+    messages.innerText += [msgBuf.join(" "), "\n"].join("")
+  } else {
+    messages.innerText += ["[", sender, "]: ", msgBuf.join(" "), "\n"].join("")
+  }
   messages.scrollTop = messages.scrollHeight;
 }
 
@@ -54,9 +103,11 @@ chatInput.addEventListener("keyup", function (e) {
     if (message.length > 0) {
       addChatMessage("You", message)
       chatInput.value = ""
-      send(buildPacket(2, gameId, targetId, message), function (xhr) {
-        console.log(xhr.responseText)
-      })
+      if (targetId != undefined) {
+        send(buildPacket(2, gameId, targetId, message), function (xhr) {
+          console.log(xhr.responseText)
+        })
+      }
     }
   }
 });
@@ -244,7 +295,7 @@ setInputFilter(targetIdIn, function (v) {
 
 targetIdIn.addEventListener("mousedown", function () { this.value = "" })
 
-function request(type, url, handler, headers = [], data = "", params = [], responseType = "text") {
+function request(type, url, callback, headers = [], data = "", params = [], responseType = "text") {
   let xhr = new XMLHttpRequest()
   xhr.responseType = responseType
   params.forEach(function (p) {
@@ -255,9 +306,9 @@ function request(type, url, handler, headers = [], data = "", params = [], respo
     xhr.setRequestHeader(h[0], h[1]);
   });
   xhr.send(data)
-  xhr.onreadystatechange = () => {
+  xhr.onreadystatechange = function () {
     if (xhr.readyState == 4) {
-      handler(xhr)
+      callback(xhr)
     }
   }
 }
@@ -379,14 +430,17 @@ function testBoard() {
   if (w == 1) {
     scores[0]++
     changeStatusShort("YOU WON")
-    alert("W")
+    addChatMessage("", "YOU WON")
+    // alert("W")
   } else if (w == -1) {
     scores[1]++
     changeStatusShort("YOU LOST")
-    alert("L")
+    addChatMessage("", "YOU LOST")
+    // alert("L")
   } else if (w == 0) {
     changeStatusShort("TIE")
-    alert("TIE")
+    addChatMessage("", "ISSA TIE")
+    // alert("TIE")
   }
   updateScores()
   resetBoard()

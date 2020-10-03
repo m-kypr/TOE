@@ -16,6 +16,7 @@
       height: max-content;
       margin: 0 auto;
       display: flex;
+      /* visibility: hidden; */
     }
 
     #grid {
@@ -111,7 +112,8 @@
       font-size: 20px;
     }
 
-    .disable-select .gridElement {
+    .disable-select,
+    .gridElement {
       user-select: none;
       -moz-user-select: none;
       -khtml-user-select: none;
@@ -124,6 +126,13 @@
       text-transform: uppercase;
       text-align: center;
     }
+
+    /* img {
+      width: max-content;
+      height: max-content;
+      visibility: visible;
+      display: block;
+    } */
   </style>
 </head>
 
