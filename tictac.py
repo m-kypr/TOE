@@ -105,5 +105,5 @@ if __name__ == "__main__":
   from threading import Thread
   t = Thread(target=house_keeper)
   t.start()
-  app.run(debug=DEBUG)
+  app.run(host='0.0.0.0', port=80, debug=DEBUG)
   t.join()
