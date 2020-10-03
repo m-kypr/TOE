@@ -1,4 +1,12 @@
 var gameId;
+var targetId;
+var connected;
+var turns;
+var turn = "X";
+var lastMove;
+var gameOver;
+var scores = [0, 0]
+const updateRate = 500
 const gridSize = 3
 const gridElementSize = 100
 const border = 3
@@ -8,8 +16,13 @@ const btn = document.getElementById("btn")
 const targetIdIn = document.getElementById("targetIdIn")
 const gameIdDiv = document.getElementById("gameId")
 const scoreDiv = document.getElementById("score")
+const messages = document.getElementById("messages")
 
 const resize = () => {
+  console.log(window.outerWidth)
+  if (window.outerWidth < ((gridElementSize + (border) * 2) * gridSize) * 2) {
+    document.getElementById("game").style.display = "block"
+  }
   for (let i = 0; i < gridSize; i++) {
     for (let j = 0; j < gridSize; j++) {
       let tmpDiv = document.createElement("div");
@@ -17,16 +30,34 @@ const resize = () => {
       tmpDiv.className = "gridElement"
       tmpDiv.style.width = gridElementSize + "px"
       tmpDiv.style.height = gridElementSize + "px"
+      tmpDiv.style.lineHeight = gridElementSize + "px"
       tmpDiv.style.border = border + "px solid black"
       gridDiv.appendChild(tmpDiv)
     }
   }
 }
 
+function addChatMessage(sender, message) {
+  messages.innerText += ["[", sender, "]: ", message, "\n"].join("")
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function sanitizeChatMessage(msg) {
+  // TODO: Implement
+  return msg
+}
+
 chatInput.addEventListener("keyup", function (e) {
   if (e.key === "Enter") {
     e.preventDefault();
-    console.log(chatInput.value)
+    let message = sanitizeChatMessage(chatInput.value);
+    if (message.length > 0) {
+      addChatMessage("You", message)
+      chatInput.value = ""
+      send(buildPacket(2, gameId, targetId, message), function (xhr) {
+        console.log(xhr.responseText)
+      })
+    }
   }
 });
 
@@ -84,19 +115,30 @@ const copyBtn = document.getElementById("copyBtn")
 animateButton(copyBtn)
 copyBtn.addEventListener("click", function () {
   copyTextToClipboard(gameId)
-  changeStatusShort("Copied to clipboard!", 2000)
+  changeStatusShort("Copied to clipboard!")
 })
 
 function changeStatusPerm(text) {
   document.getElementById("status").innerText = text
 }
 
-function changeStatusShort(text, time = 1000) {
+function changeStatusShort(text = "", error = 0, time = 2000) {
   let status = document.getElementById("status")
   let origText = status.innerText;
-  status.innerText = text
+  let origCol = status.style.backgroundColor;
+  if (error == 1) {
+    status.style.backgroundColor = "red";
+  }
+  if (text.length != 0) {
+    status.innerText = text
+  }
   setTimeout(function () {
-    status.innerText = origText
+    if (error == 1) {
+      status.style.backgroundColor = origCol
+    }
+    if (text.length != 0) {
+      status.innerText = origText
+    }
   }, time)
 }
 
@@ -137,22 +179,46 @@ function copyTextToClipboard(text) {
   });
 }
 
+function string2Bytes(string) {
+  let arr = []
+  for (let i = 0; i < string.length; i++) {
+    // console.log(string.charCodeAt(i))
+    // console.log(string[i])
+    arr.push(string.charCodeAt(i))
+  }
+  return arr
+}
+
+function buildPacket(signal, sender, receiver, message) {
+  return new Uint8Array([].concat([signal], string2Bytes(sender), string2Bytes(receiver), string2Bytes(message)))
+}
 
 btn.addEventListener("click", function (e) {
-  var arr = new Uint8Array(1)
-  arr[0] = 0
-  send(gameId, targetIdIn.value.toUpperCase(), arr, function (xhr) {
-    try {
-      let r = JSON.parse(xhr.responseText)
-      // console.log(r["msg"])
-      changeStatusShort(r["msg"])
-    } catch (error) {
-      changeStatusPerm(xhr.responseText)
-    }
-
-    // console.log(xhr.responseText)
-  })
-  // console.log(targetIdIn.value)
+  if (connected == 1) {
+    changeStatusShort("", 1)
+    return
+  }
+  targetId = targetIdIn.value
+  if (targetId.length == 6) {
+    let arr = buildPacket(0, gameId, targetId, '')
+    // let arr = new Uint8Array([].concat([0], string2Bytes(gameId), string2Bytes(targetIdIn.value)))
+    // console.log(arr)
+    send(arr, function (xhr) {
+      try {
+        let json = JSON.parse(xhr.responseText)
+        if (json['id'] == 0) {
+          connected = 1
+          document.title = "Your move!"
+          resetGame()
+          changeStatusPerm(json['msg'])
+          return
+        }
+        changeStatusShort(json['msg'], 1)
+      } catch (error) {
+        changeStatusShort(xhr.responseText)
+      }
+    }, "text")
+  }
 })
 
 
@@ -173,13 +239,14 @@ setInputFilter(targetIdIn, function (v) {
       targetIdIn.style.backgroundColor = ""
     }, 200)
   }
-  return arr.join("")
+  return arr.join("").toUpperCase()
 })
 
 targetIdIn.addEventListener("mousedown", function () { this.value = "" })
 
-function request(type, url, handler, headers = [], data = "", params = []) {
+function request(type, url, handler, headers = [], data = "", params = [], responseType = "text") {
   let xhr = new XMLHttpRequest()
+  xhr.responseType = responseType
   params.forEach(function (p) {
     url += "?" + p
   });
@@ -194,46 +261,8 @@ function request(type, url, handler, headers = [], data = "", params = []) {
     }
   }
 }
-function toUTF8Array(str) {
-  var utf8 = [];
-  for (var i = 0; i < str.length; i++) {
-    var charcode = str.charCodeAt(i);
-    if (charcode < 0x80) utf8.push(charcode);
-    else if (charcode < 0x800) {
-      utf8.push(0xc0 | (charcode >> 6),
-        0x80 | (charcode & 0x3f));
-    }
-    else if (charcode < 0xd800 || charcode >= 0xe000) {
-      utf8.push(0xe0 | (charcode >> 12),
-        0x80 | ((charcode >> 6) & 0x3f),
-        0x80 | (charcode & 0x3f));
-    }
-    // surrogate pair
-    else {
-      i++;
-      // UTF-16 encodes 0x10000-0x10FFFF by
-      // subtracting 0x10000 and splitting the
-      // 20 bits of 0x0-0xFFFFF into two halves
-      charcode = 0x10000 + (((charcode & 0x3ff) << 10)
-        | (str.charCodeAt(i) & 0x3ff));
-      utf8.push(0xf0 | (charcode >> 18),
-        0x80 | ((charcode >> 12) & 0x3f),
-        0x80 | ((charcode >> 6) & 0x3f),
-        0x80 | (charcode & 0x3f));
-    }
-  }
-  return utf8;
-}
-
-function send(sender, receiver, message, callback) {
-  let a = JSON.stringify({ "s": sender, "r": receiver, "msg": message })
-  a = toUTF8Array("AAAAAA")
-  let b = new Uint8Array(a.length)
-  for (let i = 0; i < a.length; i++) {
-    b[i] = a[i]
-  }
-  console.log(b)
-  request("POST", "/send", callback, ["Content-Type", "application/json"], b)
+function send(bytes, callback, responseType) {
+  request("POST", "/send", callback, ["Content-Type", "application/octet-stream"], bytes, [], responseType)
 }
 
 function requestGameId() {
@@ -243,29 +272,258 @@ function requestGameId() {
   })
 }
 
-function startListener() {
-  if (gameId == undefined) {
-    return
+function bytes2String(arr) {
+  let stringBuf = []
+  for (let i = 0; i < arr.length; i++) {
+    stringBuf.push(String.fromCharCode(arr[i]))
   }
-  setInterval(function () {
-    request("GET", "/recv", function (xhr) {
-      let r = JSON.parse(xhr.responseText)
-      if (r.length > 0) {
-        for (const i in r) {
-          let packet = r[i]
-          // console.log(r[i])
-          if (packet["msg"] === "0") {
-            changeStatusPerm("Connected to ID " + packet["s"])
-          }
+  return stringBuf.join("")
+}
+
+function checkBoard() {
+  for (let i = 0; i < gridSize; i++) {
+    let cArr = new Array(gridSize + 1).fill(0)
+    for (let j = 0; j < gridSize; j++) {
+      let div = document.getElementById(String(i) + String(j));
+      if (div.innerText == "X") cArr[0]++
+      if (div.innerText == "O") cArr[0]--
+      div = document.getElementById(String(j) + String(i));
+      if (div.innerText == "X") cArr[1]++
+      if (div.innerText == "O") cArr[1]--
+      div = document.getElementById(String(j) + String(j));
+      if (div.innerText == "X") cArr[2]++
+      if (div.innerText == "O") cArr[2]--
+      div = document.getElementById(String(j) + String(gridSize - 1 - j));
+      if (div.innerText == "X") cArr[3]++
+      if (div.innerText == "O") cArr[3]--
+    }
+    for (let k = 0; k < gridSize + 1; k++) {
+      if (cArr[k] == 3) {
+        return 1
+      } else if (cArr[k] == -3) {
+        return -1
+      }
+    }
+  }
+  if (turns >= 9) { return 0 }
+  return null
+}
+
+function isValidMove(move) {
+  var valid = 0;
+  Array.from(document.getElementsByClassName("gridElement")).forEach(function (e) {
+    if (move.slice(1, move.length) == e.id) {
+      if (e.innerText.length == 0) {
+        if (move[0] === "X" & turns % 2 == 0 | move[0] === "O" & turns % 2 != 0) {
+          e.innerText = move[0]
+          valid = 1;
         }
       }
-    }, [], '', ["gid=" + gameId])
-  }, 1000)
+    }
+  });
+  return valid;
+}
+
+function resetGame() {
+  scores = [0, 0]
+  updateScores()
+  resetBoard()
 }
 
 
-document.onresize = resize
+function resetBoard() {
+  gameOver = 0;
+  turns = 0;
+  Array.from(document.getElementsByClassName("gridElement")).forEach(function (e) {
+    e.innerText = "";
+  })
+}
+
+function updateScores() {
+  scoreDiv.innerText = scores.join("-")
+}
+function startListener() {
+  setInterval(function () {
+    if (gameId == undefined) {
+      return
+    }
+    request("GET", "/recv", function (xhr) {
+      try {
+        var byteArray = new Uint8Array(xhr.response)
+        if (byteArray.length == 0) { return; }
+        processPacket(byteArray)
+      } catch (error) {
+        console.log("Could not validate packet")
+        console.log(error)
+      }
+    }, [], '', ["gid=" + gameId], "arraybuffer")
+    testBoard()
+  }, updateRate)
+}
+
+function testBoard() {
+  if (gameOver == 1) { return }
+  let result = checkBoard()
+  if (result == undefined) {
+    return
+  }
+  gameOver = 1;
+  var w = -1;
+  console.log(result)
+  if (result == 1 & turn === "X" | result == -1 & turn === "O") {
+    w = 1
+  }
+  if (result == 0) {
+    w = 0
+  }
+  if (w == 1) {
+    scores[0]++
+    changeStatusShort("YOU WON")
+    alert("W")
+  } else if (w == -1) {
+    scores[1]++
+    changeStatusShort("YOU LOST")
+    alert("L")
+  } else if (w == 0) {
+    changeStatusShort("TIE")
+    alert("TIE")
+  }
+  updateScores()
+  resetBoard()
+  // setTimeout(function () {
+  //   resetBoard()
+  // }, 300)
+}
+
+
+function moveError(id) {
+  let div = document.getElementById(id)
+  let origCol = div.style.backgroundColor
+  div.style.backgroundColor = "red"
+  setTimeout(function () {
+    div.style.backgroundColor = origCol
+  }, 300)
+  changeStatusShort("Invalid Move", 1, 500)
+}
+
+
+function processPacket(packet) {
+  let signal = packet[0]
+  let sender = bytes2String(packet.slice(1, 7))
+  let receiver = bytes2String(packet.slice(7, 13))
+  let message = bytes2String(packet.slice(13, packet.length))
+  // console.log("recv packet: ", signal, sender, receiver, message)
+  switch (signal) {
+    case 0:
+      connected = 1;
+      resetGame()
+      turn = "O"
+      targetId = sender
+      changeStatusPerm("Connected to " + sender);
+      break;
+    case 1:
+      if (sender === targetId & receiver === gameId) {
+        if (message === "D") {
+          moveError(lastMove)
+          // console.log("MOVE DENIED")
+          // turns--;
+          break;
+        }
+        if (message === "C") {
+          document.getElementById(lastMove).innerText = turn;
+          turns++;
+          break;
+        }
+      }
+      let accept = "C";
+
+      if (isValidMove(message) == 0) {
+        accept = "D"
+      } else {
+        document.title = "Your move!"
+        turns++
+      }
+      send(buildPacket(1, gameId, targetId, accept), function (xhr) {
+        console.log(xhr.responseText)
+      })
+      break;
+    case 2:
+      addChatMessage(sender, message)
+      break;
+    default:
+      // Unknown / Corrupt / Invalid packet
+      break;
+  }
+}
+
+function makeMove(e) {
+  lastMove = e.id;
+  let packet = buildPacket(1, gameId, targetId, turn + e.id)
+  send(packet, function (xhr) {
+    document.title = "..."
+    console.log(xhr.responseText)
+  })
+}
+
 
 resize()
+
+
+Array.from(document.getElementsByClassName("gridElement")).forEach(function (e) {
+  var origBorderCol;
+  var state = "X";
+  e.addEventListener("mouseover", function () {
+    origBorderCol = e.style.borderColor
+    e.style.borderColor = "white"
+  })
+  e.addEventListener("mouseleave", function () {
+    e.style.borderColor = origBorderCol
+  })
+  e.addEventListener("click", function (event) {
+    if (gameOver == 1) {
+      event.preventDefault()
+      return
+    }
+    if (connected == 1) {
+      makeMove(e)
+      return
+    }
+    //
+    // We are local
+    //
+    // alert("LOCAL")
+    if (e.innerText.length == 0) {
+      if (turns % 2 == 0) {
+        e.innerText = "X"
+      } else {
+        e.innerText = "O"
+      }
+      turns++
+    }
+    let result = checkBoard()
+    if (result == undefined) {
+      return
+    }
+    if (result == 1) {
+      scores[0]++
+      changeStatusShort("X WON")
+    } else if (result == -1) {
+      scores[1]++
+      changeStatusShort("O WON")
+    } else if (result == 0) {
+      changeStatusShort("TIE")
+    }
+    gameOver = 1;
+    updateScores()
+    setTimeout(function () {
+      resetBoard()
+    }, 2000)
+  })
+})
+
+document.onresize = resize
+
+turns = 0;
 requestGameId()
 startListener()
+

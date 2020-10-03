@@ -1,43 +1,29 @@
-import json
-from error import *
-
-PACKETS = set()
+from settings import UUID_LENGTH, ENCODING
+from error import InvalidPacketError
 
 
-class Packet(dict):
-  def __init__(self, sender="", receiver="", msg=""):
-    self.s = sender
-    self.r = receiver
-    self.msg = self.II+msg
-    global PACKETS
-    PACKETS.add(self.__class__)
-    dict.__init__(self, s=self.s, r=self.r, msg=self.msg)
+class Packet():
+  def __init__(self, signal, sender, receiver, message):
+    self.signal = int(signal)
+    self.sender = sender
+    self.receiver = receiver
+    self.message = message
+
+    try:
+      if not self.validate():
+        raise InvalidPacketError(self)
+    except Exception as e:
+      raise InvalidPacketError(self)
 
   @staticmethod
-  def from_str(string):
-    j = json.loads(string)
-    global PACKETS
-    for packet in PACKETS:
-      if packet.II == j['msg']:
-        return packet(j['s'], j['r'])
+  def from_bytes(arr):
+    return Packet(arr[0], arr[1:UUID_LENGTH+1], arr[UUID_LENGTH+1:UUID_LENGTH*2+1], arr[UUID_LENGTH*2+1:len(arr)])
+
+  def to_byte(self):
+    return bytes([self.signal]) + bytes(self.sender) + bytes(self.receiver) + bytes(self.message)
 
   def validate(self):
-    if self.s is not None and self.r is not None and self.msg is not None:
-      return 1
-    raise InvalidPacketError(self)
+    return len(self.sender) <= UUID_LENGTH or len(self.receiver) <= UUID_LENGTH
 
-
-class ConnectPacket(Packet):
-  II = "0"
-
-
-class MovePacket(Packet):
-  II = "1"
-
-
-class ConfirmPacket(Packet):
-  II = "2"
-
-
-class ChatPacket(Packet):
-  II = "3"
+  def __repr__(self):
+    return str(self.__dict__)

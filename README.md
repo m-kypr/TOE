@@ -6,26 +6,56 @@ Each session is assigned an UUID (Game ID) by sending the Game ID, the server co
 
 Packets are sent to the server that stores the packets until the connected player retrieves them 
 
-### Packets
-The packets are in json format
+## Packets
 
-{'sender': 'gameID', 'receiver': 'gameID', 'msg': 'indicator integer (II) + message'}
+Format: byte arrays with length > 12
 
-The IIs:
-0 - Connect request | x
-1 - Move request    |
-2 - Confirm signal  |
-3 - Chat signal     |
+| Name     | Length | Position |
+| -------- |:------:| --------:|
+| Signal   | 1      | 1        |
+| Sender   | 6      | 2        |
+| Receiver | 6      | 3        |
+| Message  | 1000   | 4        |
 
-### Error Messages
-0 - Invalid GameId
-1 - 
+
+| Packet       | UInt |
+| -------      | ----:|
+| Connect      | 0    |
+| Move         | 1    |
+| Chat         | 2    |
+
+Packet Messages
+
+| Message      | Code     |
+| ------------ | --------:|
+| Move Request | SYM + ID |
+| Move Confirm | C        |
+| Move Deny    | D        |
+
+
+## Status Messages
+
+Format: JSON
+
+| Name                   | ID |
+| ---------------------- |:--:|
+| Success                | 0  |
+| InvalidGameId          | 1  |
+| InvalidPacket          | 2  |
+| BadRequest             | 3  |
+| PlayerAlreadyConnected | 4  |
+
+
 
 ## TODO
 
-* implement chat packet 3
-* implement packets 1-2
-* implement disconnect detection -> free game id if there is no /recv request for 1 min 
+* make error handling good
+* sanitize chat messages
+
+
+## Dev LOG
+
+10/3 IT WORKS
 
 
 ## Usage
