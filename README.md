@@ -47,8 +47,14 @@ Format: JSON
 
 
 
+## Twitch emotes
+
+Currently only supports global BetterTTV emotes
+
+
 ## TODO
 
+* include more emotes
 * make error handling good
 * sanitize chat messages
 

@@ -22,7 +22,7 @@ app = Flask(__name__)
 def emote():
   id = request.args.get("id")
   import requests
-  buf = requests.get(f"https://cdn.betterttv.net/emote/{id}/4x").content
+  buf = requests.get(f"https://cdn.betterttv.net/emote/{id}/1x").content
   a = open("static/emote.png", 'wb').write(buf)
   return buf
 

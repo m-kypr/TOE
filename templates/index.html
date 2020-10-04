@@ -80,7 +80,11 @@
     span {
       display: inline-flexbox;
       vertical-align: middle;
+    }
+
+    .btn>span {
       line-height: 33px;
+
     }
 
     #status {
@@ -127,12 +131,12 @@
       text-align: center;
     }
 
-    /* img {
+    img {
       width: max-content;
       height: max-content;
       visibility: visible;
-      display: block;
-    } */
+      display: inline-block;
+    }
   </style>
 </head>
 
@@ -143,7 +147,7 @@
       <div id="gameIdText">Your Game ID: </div>
       <div id="gameId"></div>
       <div id="copyBtnDiv">
-        <div id="copyBtn"><span class="disable-select">copy</span></div>
+        <div id="copyBtn" class="btn"><span class="disable-select">copy</span></div>
       </div>
       <div>
         <div id="scoreText">Score: </div>
@@ -152,7 +156,7 @@
       <div id="status">Waiting for player...</div>
       <input type="text" id="targetIdIn">
       <div id="btnDiv">
-        <div id="btn"><span class="disable-select">></span></div>
+        <div id="btn" class="btn"><span class="disable-select">></span></div>
       </div>
       <div id="chat">
         <span>Chat:</span>

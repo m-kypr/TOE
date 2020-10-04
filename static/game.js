@@ -20,7 +20,7 @@ const scoreDiv = document.getElementById("score")
 const messages = document.getElementById("messages")
 
 const resize = () => {
-  console.log(window.outerWidth)
+  console.log(window.outerWidth, window.outerHeight)
   if (window.outerWidth < ((gridElementSize + (border) * 2) * gridSize) * 2) {
     document.getElementById("game").style.display = "block"
   }
@@ -47,47 +47,115 @@ function _arrayBufferToBase64(buffer) {
   return window.btoa(binary);
 }
 
-function emotify(text) {
-  // 56e9f494fff3cc5c35e5287e
-  // https://api.betterttv.net/3/cached/emote
+function makeRequest(method, url, headers = [], data = "", params = [], responseType = "text") {
+  return new Promise(function (resolve, reject) {
+    let xhr = new XMLHttpRequest();
+
+    xhr.responseType = responseType
+    params.forEach(function (p) {
+      url += "?" + p
+    });
+    xhr.open(method, url);
+    headers.forEach(function (h) {
+      xhr.setRequestHeader(h[0], h[1]);
+    });
+    xhr.onload = function () {
+      if (this.status >= 200 && this.status < 300) {
+        resolve(xhr.response);
+      } else {
+        reject({
+          status: this.status,
+          statusText: xhr.statusText
+        });
+      }
+    };
+    xhr.onerror = function () {
+      reject({
+        status: this.status,
+        statusText: xhr.statusText
+      });
+    };
+    xhr.send(data);
+  });
+}
+
+async function emotify(text, callback) {
+  // https://api.betterttv.net/3/cached/emotes/global
   if (emotes.length == 0) {
-    request("GET", "https://api.betterttv.net/3/cached/emotes/global", function (xhr) {
-      emotes = JSON.parse(xhr.responseText)
-    })
+    emotes = JSON.parse(await makeRequest("GET", "https://api.betterttv.net/3/cached/emotes/global"))
+    // console.log(emotes)
   }
   for (let i = 0; i < emotes.length; i++) {
-    let emote = emotes[i]
-    if (emote['data'] == undefined) {
-      request("GET", "/emote", function (xhr) {
-        emote['data'] = _arrayBufferToBase64(xhr.response)
-      }, [], "", ["id=" + emote['id']], "arraybuffer")
-      if (emote['code'] === text) {
-        return emote['data']
+    if (emotes[i]['code'] === text) {
+      if (emotes[i]['data'] == undefined) {
+        emotes[i]['data'] = _arrayBufferToBase64(await makeRequest("GET", "/emote", [], "", ["id=" + emotes[i]['id']], "arraybuffer"))
       }
+      // console.log(emotes[i])
+      callback(emotes[i]['data'])
+      return
+      // return emotes[i]['data']
     }
   }
-  return 0;
+  callback(0)
 }
 
 
 function addChatMessage(sender = "", message) {
   var msgBuf = []
-  message.split(" ").forEach(function (w) {
-    let data = emotify(w)
-    console.log(data)
-    if (data == 0) {
-      msgBuf.push(w)
-      return
-    }
-    let tmpImg = document.createElement("img")
-    tmpImg.src = "data:image/png;base64," + _arrayBufferToBase64(xhr.response)
-    document.getElementById("messages").appendChild(tmpImg)
+  var words = message.split(" ").filter(function (el) {
+    return el != "";
   })
-  if (sender.length == 0) {
-    messages.innerText += [msgBuf.join(" "), "\n"].join("")
-  } else {
-    messages.innerText += ["[", sender, "]: ", msgBuf.join(" "), "\n"].join("")
-  }
+  // console.log(words)
+  var emoteStack = []
+  words.forEach(function (w) {
+    // console.log(w)
+    emotify(w, function (data) {
+      if (data == 0) {
+        msgBuf.push(w)
+        return
+      }
+      emoteStack.push(data)
+      msgBuf.push("")
+    })
+  })
+  let chatLine = document.createElement("div")
+  chatLine.className = "chat-line";
+  // chatLine.style.border = "1px solid red"
+  chatLine.innerText = ["[", sender, "]: "].join("")
+  let interval = setInterval(() => {
+    if (msgBuf.length < words.length) {
+      return;
+    }
+    // console.log(msgBuf)
+    if (sender.length != 0) {
+      for (let i = 0; i < msgBuf.length; i++) {
+        let word = msgBuf[i]
+        let textFragment = document.createElement("span")
+        if (word.length == 0) {
+          if (textFragment.innerText.length != 0) {
+            chatLine.appendChild(textFragment)
+            textFragment = document.createElement("span")
+          }
+          let data = emoteStack.pop()
+          let tmpImg = document.createElement("img")
+          chatLine.appendChild(tmpImg)
+          tmpImg.src = "data:image/png;base64," + data
+        } else {
+          let a = word
+          if (i != msgBuf.length - 1) {
+            a += " "
+          }
+          textFragment.innerText += a
+        }
+        chatLine.appendChild(textFragment);
+      }
+      document.getElementById("messages").appendChild(chatLine)
+    }
+    // else {
+    //   messages.innerHTML += ["[", sender, "]: ", msgBuf.join(" "), "\n"].join("")
+    // }
+    clearInterval(interval)
+  }, 1000);
   messages.scrollTop = messages.scrollHeight;
 }
 
@@ -173,20 +241,25 @@ function changeStatusPerm(text) {
   document.getElementById("status").innerText = text
 }
 
-function changeStatusShort(text = "", error = 0, time = 2000) {
+function changeStatusShort(text = "", s = 0, time = 2000) {
   let status = document.getElementById("status")
   let origText = status.innerText;
   let origCol = status.style.backgroundColor;
-  if (error == 1) {
-    status.style.backgroundColor = "red";
+  switch (s) {
+    case 1:
+      status.style.backgroundColor = "red";
+      break;
+    case 2:
+      status.style.backgroundColor = "green";
+      break;
+    default:
+      break;
   }
   if (text.length != 0) {
     status.innerText = text
   }
   setTimeout(function () {
-    if (error == 1) {
-      status.style.backgroundColor = origCol
-    }
+    status.style.backgroundColor = origCol
     if (text.length != 0) {
       status.innerText = origText
     }
@@ -412,6 +485,7 @@ function startListener() {
   }, updateRate)
 }
 
+
 function testBoard() {
   if (gameOver == 1) { return }
   let result = checkBoard()
@@ -429,12 +503,12 @@ function testBoard() {
   }
   if (w == 1) {
     scores[0]++
-    changeStatusShort("YOU WON")
+    changeStatusShort("YOU WON", 2)
     addChatMessage("", "YOU WON")
     // alert("W")
   } else if (w == -1) {
     scores[1]++
-    changeStatusShort("YOU LOST")
+    changeStatusShort("YOU LOST", 1)
     addChatMessage("", "YOU LOST")
     // alert("L")
   } else if (w == 0) {
@@ -444,9 +518,6 @@ function testBoard() {
   }
   updateScores()
   resetBoard()
-  // setTimeout(function () {
-  //   resetBoard()
-  // }, 300)
 }
 
 
