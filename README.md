@@ -68,3 +68,7 @@ Currently only supports global BetterTTV emotes
 Start the server with:
 
 python tictac.py
+
+To use the twitch API (emotes) you need to add a client-id.json with contents:
+
+{"client-id": "YOUR_CLIENT_ID"}

@@ -2,6 +2,7 @@ import logging
 import time
 import random
 import json
+import requests
 from flask import Flask, render_template, request, abort, jsonify
 from error import *
 from packet import Packet
@@ -20,11 +21,29 @@ app = Flask(__name__)
 
 @app.route('/emote')
 def emote():
-  id = request.args.get("id")
-  import requests
-  buf = requests.get(f"https://cdn.betterttv.net/emote/{id}/1x").content
-  a = open("static/emote.png", 'wb').write(buf)
-  return buf
+  try:
+    id = request.args.get("id")
+    link = request.args.get("link")
+    if id:
+      # print(f"https://cdn.betterttv.net/emote/{id}/1x")
+      # buf =
+      # a = open("static/emote.png", 'wb').write(buf)
+      return requests.get(f"https://cdn.betterttv.net/emote/{id}/1x").content
+    if link:
+      return requests.get(link).content
+      # return buf
+    # client_id = json.loads(
+    #     open("static/client-id.json", "r").read())['client-id']
+    # print(client_id)
+    # import requests
+    # r = requests.get("https://api.twitch.tv/helix/chat/emoticons",
+    #                  params={"client_id": client_id, "Accept": "application/json"})
+    # print(r.url)
+    # print(r.content)
+  except Exception as e:
+    print(e)
+    pass
+  return "NO EMOTES AVAILABLE"
 
 
 @app.route('/gid')
@@ -114,5 +133,5 @@ if __name__ == "__main__":
   from threading import Thread
   t = Thread(target=house_keeper)
   t.start()
-  app.run(host='0.0.0.0', port=80, debug=True)
+  app.run(host='0.0.0.0', port=5000, debug=True)
   t.join()

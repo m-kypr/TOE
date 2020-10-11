@@ -80,15 +80,26 @@ function makeRequest(method, url, headers = [], data = "", params = [], response
 }
 
 async function emotify(text, callback) {
+  // https://api.betterttv.net/3/cached/badges
   // https://api.betterttv.net/3/cached/emotes/global
+  // https://api.betterttv.net/3/cached/frankerfacez/emotes/global
   if (emotes.length == 0) {
-    emotes = JSON.parse(await makeRequest("GET", "https://api.betterttv.net/3/cached/emotes/global"))
+    emotes = []
+    emotes.push(...JSON.parse(await makeRequest("GET", "https://api.betterttv.net/3/cached/emotes/global")))
+    emotes.push(...JSON.parse(await makeRequest("GET", "https://api.betterttv.net/3/cached/frankerfacez/emotes/global")))
+    emotes.push(...JSON.parse(await makeRequest("GET", "https://api.betterttv.net/3/cached/badges")))
     // console.log(emotes)
   }
   for (let i = 0; i < emotes.length; i++) {
     if (emotes[i]['code'] === text) {
+      // console.log(emotes[i])
       if (emotes[i]['data'] == undefined) {
-        emotes[i]['data'] = _arrayBufferToBase64(await makeRequest("GET", "/emote", [], "", ["id=" + emotes[i]['id']], "arraybuffer"))
+        // console.log(emotes[i]['images'])
+        if (emotes[i]['images'] != undefined) {
+          emotes[i]['data'] = _arrayBufferToBase64(await makeRequest("GET", "/emote", [], "", ["link=" + emotes[i]['images']['1x']], "arraybuffer"))
+        } else {
+          emotes[i]['data'] = _arrayBufferToBase64(await makeRequest("GET", "/emote", [], "", ["id=" + emotes[i]['id']], "arraybuffer"))
+        }
       }
       // console.log(emotes[i])
       callback(emotes[i]['data'])

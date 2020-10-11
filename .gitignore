@@ -1,3 +1,5 @@
 env
+*.png
 .vscode
 __pycache__/
+client-id.json
